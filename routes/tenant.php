@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\Tenant\TenantAuthController;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
@@ -25,5 +26,23 @@ Route::middleware([
 ])->group(function () {
     Route::get('/', function () {
         return 'This is your multi-tenant application. The id of the current tenant is ' . tenant('id');
+    });
+});
+
+// API routes for tenant
+Route::prefix('api/v1')->middleware([
+    InitializeTenancyByDomain::class,
+    PreventAccessFromCentralDomains::class,
+])->group(function () {
+    // Public routes with auth rate limiter (5/min - brute force protection)
+    Route::middleware('throttle:auth')->group(function (): void {
+        Route::post('register', [TenantAuthController::class, 'register'])->name('tenant.api.v1.register');
+        Route::post('login', [TenantAuthController::class, 'login'])->name('tenant.api.v1.login');
+    });
+
+    // Protected routes with authenticated rate limiter (120/min)
+    Route::middleware(['auth:sanctum', 'throttle:authenticated'])->group(function (): void {
+        Route::post('logout', [TenantAuthController::class, 'logout'])->name('tenant.api.v1.logout');
+        Route::get('me', [TenantAuthController::class, 'me'])->name('tenant.api.v1.me');
     });
 });
