@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\UserRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -35,7 +36,7 @@ final class UserController extends ApiController
     {
         $data = $request->validated();
         $data['password'] = Hash::make($data['password']);
-        
+
         $user = User::create($data);
 
         return $this->created($user, 'Usuario creado exitosamente.');
@@ -59,7 +60,7 @@ final class UserController extends ApiController
     public function update(UserRequest $request, User $user): JsonResponse
     {
         $data = $request->validated();
-        
+
         if (isset($data['password'])) {
             $data['password'] = Hash::make($data['password']);
         } else {
@@ -79,7 +80,7 @@ final class UserController extends ApiController
     public function destroy(User $user): JsonResponse
     {
         // Evitar que un usuario se elimine a sí mismo
-        if (auth()->id() === $user->id) {
+        if (Auth::id() === $user->id) {
             return $this->error('No puedes eliminar tu propio usuario.', 403);
         }
 
