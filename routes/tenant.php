@@ -31,6 +31,7 @@ Route::middleware([
 
 // API routes for tenant
 Route::prefix('api/v1')->middleware([
+    'api',
     InitializeTenancyByDomain::class,
     PreventAccessFromCentralDomains::class,
 ])->group(function () {
@@ -44,5 +45,9 @@ Route::prefix('api/v1')->middleware([
     Route::middleware(['auth:sanctum', 'throttle:authenticated'])->group(function (): void {
         Route::post('logout', [TenantAuthController::class, 'logout'])->name('tenant.api.v1.logout');
         Route::get('me', [TenantAuthController::class, 'me'])->name('tenant.api.v1.me');
+
+        // Categories
+        Route::apiResource('categories', \App\Http\Controllers\Api\V1\Tenant\CategoryController::class)
+            ->names('tenant.api.v1.categories');
     });
 });

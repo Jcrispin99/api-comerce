@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use Dedoc\Scramble\Scramble;
+use Dedoc\Scramble\Support\Generator\OpenApi;
+use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -25,6 +28,19 @@ final class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureRateLimiting();
+
+        Scramble::extendOpenApi(function (OpenApi $openApi) {
+            $description = 'Ingresa tu token de Sanctum.';
+
+            if ($debugToken = env('DEBUG_TOKEN')) {
+                $description .= " **(Debug Token: `{$debugToken}`)**";
+            }
+
+            $openApi->secure(
+                SecurityScheme::http('bearer')
+                    ->setDescription($description)
+            );
+        });
     }
 
     /**
@@ -33,13 +49,13 @@ final class AppServiceProvider extends ServiceProvider
     private function configureRateLimiting(): void
     {
         // Default API rate limiter - 60 requests per minute
-        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
+        RateLimiter::for('api', fn(Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
 
         // Auth endpoints - more restrictive (prevent brute force)
-        RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(5)->by($request->ip()));
+        RateLimiter::for('auth', fn(Request $request) => Limit::perMinute(5)->by($request->ip()));
 
         // Authenticated user requests - higher limit
-        RateLimiter::for('authenticated', fn (Request $request) => $request->user()
+        RateLimiter::for('authenticated', fn(Request $request) => $request->user()
             ? Limit::perMinute(120)->by($request->user()->id)
             : Limit::perMinute(60)->by($request->ip()));
     }
