@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Tenant;
 
 use App\Http\Controllers\Api\ApiController;
-use App\Http\Requests\Api\V1\StoreCategoryRequest;
+use App\Http\Requests\Api\V1\CategoryRequest;
 use App\Models\Category;
 use Illuminate\Http\JsonResponse;
 
@@ -30,7 +30,7 @@ final class CategoryController extends ApiController
      *
      * Registra una nueva categoría en el tenant.
      */
-    public function store(StoreCategoryRequest $request): JsonResponse
+    public function store(CategoryRequest $request): JsonResponse
     {
         $category = Category::create($request->validated());
 
@@ -48,7 +48,7 @@ final class CategoryController extends ApiController
     /**
      * Actualizar categoría.
      */
-    public function update(StoreCategoryRequest $request, Category $category): JsonResponse
+    public function update(CategoryRequest $request, Category $category): JsonResponse
     {
         $category->update($request->validated());
 

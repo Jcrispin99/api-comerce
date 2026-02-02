@@ -49,5 +49,13 @@ Route::prefix('api/v1')->middleware([
         // Categories
         Route::apiResource('categories', \App\Http\Controllers\Api\V1\Tenant\CategoryController::class)
             ->names('tenant.api.v1.categories');
+
+        // Companies
+        Route::apiResource('companies', \App\Http\Controllers\Api\V1\Tenant\CompanyController::class)
+            ->names('tenant.api.v1.companies');
+
+        // Users
+        Route::apiResource('users', \App\Http\Controllers\Api\V1\Tenant\UserController::class)
+            ->names('tenant.api.v1.users');
     });
 });
