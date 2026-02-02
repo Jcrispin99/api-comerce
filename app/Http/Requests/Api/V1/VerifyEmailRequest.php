@@ -19,6 +19,21 @@ final class VerifyEmailRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [];
+        return [
+            // Scramble will pick up these from the route parameters
+            'id' => ['required', 'integer'],
+            'hash' => ['required', 'string'],
+        ];
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'id' => $this->route('id'),
+            'hash' => $this->route('hash'),
+        ]);
     }
 }

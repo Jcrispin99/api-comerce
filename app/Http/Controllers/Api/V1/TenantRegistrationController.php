@@ -5,72 +5,75 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Http\Requests\Api\V1\StoreTenantRequest;
 use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 final class TenantRegistrationController extends ApiController
 {
     /**
-     * Registrar un nuevo tenant con su dominio.
+     * Registrar un nuevo tenant con su dueño (usuario central).
      *
      * Esto creará:
-     * - Un registro en la tabla 'tenants' (BD central)
-     * - Un dominio asociado en la tabla 'domains' (BD central)
-     * - Una nueva base de datos para el tenant (ej: tenant_foo)
+     * - Un usuario en la base de datos central.
+     * - Un registro en la tabla 'tenants' vinculado a ese usuario.
+     * - Un dominio asociado.
+     * - Una base de datos para el tenant con el mismo usuario replicado.
      *
      * POST /api/v1/tenants
-     * Body: { "id": "foo", "domain": "foo.localhost" }
+     * Body: { "id": "foo", "domain": "foo", "name": "Admin", "email": "admin@foo.com", "password": "password", "password_confirmation": "password" }
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreTenantRequest $request): JsonResponse
     {
-        // Si el dominio no contiene un punto, asumimos que es un subdominio y le agregamos el dominio central
-        $dat = $request->all();
-        if (! str_contains($dat['domain'], '.')) {
-            $centralDomain = config('tenancy.central_domains')[0] ?? 'localhost';
-            $dat['domain'] = $dat['domain'] . '.' . $centralDomain;
-        }
+        $validated = $request->validated();
 
-        $validator = Validator::make($dat, [
-            'id' => [
-                'required',
-                'string',
-                'max:255',
-                'unique:tenants,id',
-                'regex:/^[a-z0-9-]+$/',
-            ],
-            'domain' => [
-                'required',
-                'string',
-                'max:255',
-                'unique:domains,domain',
-            ],
-        ], [
-            'id.required' => 'El ID del tenant es requerido.',
-            'id.unique' => 'Este tenant ID ya existe.',
-            'id.regex' => 'El tenant ID solo puede contener letras minúsculas, números y guiones.',
-            'domain.required' => 'El dominio es requerido.',
-            'domain.unique' => 'Este dominio ya está registrado.',
+        // 1. Crear el usuario en la base de datos central (Dueño)
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
         ]);
 
-        if ($validator->fails()) {
-            return $this->error($validator->errors()->first(), 422);
+        try {
+            // 2. Crear el tenant vinculado al usuario
+            $tenant = Tenant::create([
+                'id' => $validated['id'],
+                'user_id' => $user->id,
+            ]);
+
+            // 3. Asociar el dominio al tenant
+            $domain = $tenant->domains()->create(['domain' => $validated['domain']]);
+
+            // 4. Crear el mismo usuario dentro de la base de datos del tenant
+            $tenant->run(function () use ($validated) {
+                User::create([
+                    'name' => $validated['name'],
+                    'email' => $validated['email'],
+                    'password' => Hash::make($validated['password']),
+                    'email_verified_at' => now(),
+                ]);
+            });
+
+            return $this->created([
+                'tenant' => [
+                    'id' => $tenant->id,
+                    'domain' => $domain->domain,
+                    'database' => config('tenancy.database.prefix') . $tenant->id,
+                ],
+                'owner' => [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ],
+            ], 'Tenant y usuario administrador registrados exitosamente.');
+        } catch (\Exception $e) {
+            // Si algo falla después de crear el usuario central, podrías optar por eliminarlo
+            // o dejarlo para que el usuario intente registrar el tenant de nuevo con el mismo email (si no falla la validación)
+            // Por seguridad, si el tenant falla, eliminamos el usuario central creado para permitir reintento limpio.
+            $user->delete();
+            throw $e;
         }
-
-        // Crear el tenant (esto automáticamente crea la base de datos del tenant)
-        $tenant = Tenant::create(['id' => $dat['id']]);
-
-        // Asociar el dominio al tenant
-        $domain = $tenant->domains()->create(['domain' => $dat['domain']]);
-
-        return $this->created([
-            'tenant' => [
-                'id' => $tenant->id,
-                'domain' => $domain->domain,
-                'database' => "tenant{$tenant->id}",
-                'created_at' => $tenant->created_at,
-            ],
-        ], 'Tenant registrado exitosamente.');
     }
 }
