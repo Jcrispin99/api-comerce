@@ -11,6 +11,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 /**
  * @property int $id
@@ -23,7 +25,7 @@ use Laravel\Sanctum\HasApiTokens;
  */
 final class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens;
+    use HasApiTokens, LogsActivity;
 
     /** @use HasFactory<UserFactory> */
     use HasFactory;
@@ -39,15 +41,22 @@ final class User extends Authenticatable implements MustVerifyEmail
         'name',
         'email',
         'password',
-        'company_id',
     ];
 
-    /**
-     * Get the company that the user belongs to.
-     */
-    public function company()
+    public function getActivitylogOptions(): LogOptions
     {
-        return $this->belongsTo(Company::class);
+        return LogOptions::defaults()
+            ->logOnly(['name', 'email'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
+
+    /**
+     * Get the companies that the user belongs to.
+     */
+    public function companies()
+    {
+        return $this->belongsToMany(Company::class);
     }
 
     /**

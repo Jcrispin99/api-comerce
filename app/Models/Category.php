@@ -3,9 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Category extends Model
 {
+    use LogsActivity;
+
     protected $fillable = [
         'name',
         'description',
@@ -13,6 +17,14 @@ class Category extends Model
         'parent_id',
         'is_active',
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'description', 'full_name', 'is_active'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 
     protected function casts(): array
     {

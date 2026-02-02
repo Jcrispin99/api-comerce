@@ -39,7 +39,8 @@ class UserRequest extends FormRequest
                 Password::defaults(),
                 'confirmed'
             ],
-            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+            'company_ids' => ['nullable', 'array'],
+            'company_ids.*' => ['integer', 'exists:companies,id'],
         ];
     }
 
@@ -52,7 +53,7 @@ class UserRequest extends FormRequest
             'name' => 'nombre',
             'email' => 'correo electrónico',
             'password' => 'contraseña',
-            'company_id' => 'compañía',
+            'company_ids' => 'compañías',
         ];
     }
 }

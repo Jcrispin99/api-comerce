@@ -24,7 +24,7 @@ final class UserController extends ApiController
      */
     public function index(): JsonResponse
     {
-        return $this->success(User::with('company')->get());
+        return $this->success(User::with('companies')->get());
     }
 
     /**
@@ -39,7 +39,11 @@ final class UserController extends ApiController
 
         $user = User::create($data);
 
-        return $this->created($user, 'Usuario creado exitosamente.');
+        if (isset($data['company_ids'])) {
+            $user->companies()->sync($data['company_ids']);
+        }
+
+        return $this->created($user->load('companies'), 'Usuario creado exitosamente.');
     }
 
     /**
@@ -49,7 +53,7 @@ final class UserController extends ApiController
      */
     public function show(User $user): JsonResponse
     {
-        return $this->success($user->load('company'));
+        return $this->success($user->load('companies'));
     }
 
     /**
@@ -69,7 +73,11 @@ final class UserController extends ApiController
 
         $user->update($data);
 
-        return $this->success($user, 'Usuario actualizado exitosamente.');
+        if (isset($data['company_ids'])) {
+            $user->companies()->sync($data['company_ids']);
+        }
+
+        return $this->success($user->load('companies'), 'Usuario actualizado exitosamente.');
     }
 
     /**

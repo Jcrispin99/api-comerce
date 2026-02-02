@@ -4,11 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 
 class Company extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     /**
      * The attributes that are mass assignable.
@@ -33,6 +34,23 @@ class Company extends Model
         'branch_code',
         'is_main_office',
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'business_name',
+                'trade_name',
+                'ruc',
+                'address',
+                'phone',
+                'email',
+                'branch_code',
+                'active',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 
     /**
      * The attributes that should be cast.
@@ -70,7 +88,7 @@ class Company extends Model
      */
     public function users()
     {
-        return $this->hasMany(User::class);
+        return $this->belongsToMany(User::class);
     }
 
     /**
