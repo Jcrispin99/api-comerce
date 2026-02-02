@@ -16,9 +16,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 // Central routes - only accessible from central domain
-$centralDomains = config('tenancy.central_domains', ['api-comerce.test']);
-
-Route::domain($centralDomains[0])->middleware('central.only')->group(function (): void {
+Route::middleware('central.only')->group(function (): void {
     // Public routes with auth rate limiter (5/min - brute force protection)
     Route::middleware('throttle:auth')->group(function (): void {
         Route::post('register', [AuthController::class, 'register'])->name('auth.register');
