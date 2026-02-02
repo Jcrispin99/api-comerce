@@ -5,15 +5,39 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Http\Requests\Api\V1\ListDomainsRequest;
 use App\Http\Requests\Api\V1\StoreTenantRequest;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Stancl\Tenancy\Database\Models\Domain;
 
+/**
+ * @group Registro de Tenants
+ *
+ * Maneja la creación de nuevos clientes y sus bases de datos.
+ */
 final class TenantRegistrationController extends ApiController
 {
+    /**
+     * Listar todos los dominios registrados.
+     *
+     * Retorna una lista simple con los nombres de los dominios de los tenants.
+     *
+     * GET /api/v1/tenants/domains
+     */
+    public function index(ListDomainsRequest $request): JsonResponse
+    {
+        $domains = Domain::query()
+            ->select('domain')
+            ->get()
+            ->pluck('domain');
+
+        return $this->success($domains, 'Dominios obtenidos exitosamente.');
+    }
+
     /**
      * Registrar un nuevo tenant con su dueño (usuario central).
      *

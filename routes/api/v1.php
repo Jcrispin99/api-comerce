@@ -16,17 +16,19 @@ use Illuminate\Support\Facades\Route;
 */
 
 // Central routes - only accessible from central domain
-Route::middleware('central.only')->group(function (): void {
+$centralDomains = config('tenancy.central_domains', ['api-comerce.test']);
+
+Route::domain($centralDomains[0])->middleware('central.only')->group(function (): void {
     // Public routes with auth rate limiter (5/min - brute force protection)
     Route::middleware('throttle:auth')->group(function (): void {
-        Route::post('register', [AuthController::class, 'register'])->name('api.v1.register');
-        Route::post('login', [AuthController::class, 'login'])->name('api.v1.login');
+        Route::post('register', [AuthController::class, 'register'])->name('auth.register');
+        Route::post('login', [AuthController::class, 'login'])->name('auth.login');
     });
 
     // Protected routes with authenticated rate limiter (120/min)
     Route::middleware(['auth:sanctum', 'throttle:authenticated'])->group(function (): void {
-        Route::post('logout', [AuthController::class, 'logout'])->name('api.v1.logout');
-        Route::get('me', [AuthController::class, 'me'])->name('api.v1.me');
+        Route::post('logout', [AuthController::class, 'logout'])->name('auth.logout');
+        Route::get('me', [AuthController::class, 'me'])->name('auth.me');
 
         // Email verification
         Route::post('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
@@ -46,6 +48,9 @@ Route::middleware('central.only')->group(function (): void {
     });
 
     // Tenant registration (central routes)
+    Route::get('tenants/domains', [TenantRegistrationController::class, 'index'])
+        ->name('api.v1.tenants.domains');
+
     Route::post('tenants', [TenantRegistrationController::class, 'store'])
         ->middleware('throttle:6,1')
         ->name('api.v1.tenants.store');

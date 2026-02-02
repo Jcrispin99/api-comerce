@@ -20,9 +20,7 @@ final class VerifyEmailRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Scramble will pick up these from the route parameters
-            'id' => ['required', 'integer'],
-            'hash' => ['required', 'string'],
+            //
         ];
     }
 

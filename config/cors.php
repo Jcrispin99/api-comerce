@@ -21,9 +21,14 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => [
+        env('FRONTEND_URL', 'http://localhost:5173'),
+        'http://api-comerce.test',
+    ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '#^https?://.*\.api-comerce\.test$#',
+    ],
 
     'allowed_headers' => ['*'],
 
@@ -35,10 +40,11 @@ return [
         'X-API-Version-Status',
         'Deprecation',
         'Sunset',
+        'Authorization',
     ],
 
     'max_age' => 86400, // 24 hours
 
-    'supports_credentials' => false,
+    'supports_credentials' => true,
 
 ];

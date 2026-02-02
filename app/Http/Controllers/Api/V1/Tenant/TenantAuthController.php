@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * Controller para autenticación de usuarios de tenant.
+ * @group Autenticación Tenant
  *
  * Este controller maneja el registro, login y logout de usuarios
  * dentro de cada tenant (usuarios finales de cada cliente).
