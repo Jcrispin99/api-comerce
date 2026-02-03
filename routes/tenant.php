@@ -57,5 +57,9 @@ Route::prefix('api/v1')->middleware([
         // Users
         Route::apiResource('users', \App\Http\Controllers\Api\V1\Tenant\UserController::class)
             ->names('tenant.api.v1.users');
+
+        // Attributes
+        Route::apiResource('attributes', \App\Http\Controllers\Api\V1\Tenant\AttributeController::class)
+            ->names('tenant.api.v1.attributes');
     });
 });
