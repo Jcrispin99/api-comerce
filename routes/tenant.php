@@ -61,5 +61,17 @@ Route::prefix('api/v1')->middleware([
         // Attributes
         Route::apiResource('attributes', \App\Http\Controllers\Api\V1\Tenant\AttributeController::class)
             ->names('tenant.api.v1.attributes');
+
+        // Products
+        Route::apiResource('products', \App\Http\Controllers\Api\V1\Tenant\ProductController::class)
+            ->names('tenant.api.v1.products');
+
+        // Warehouses
+        Route::apiResource('warehouses', \App\Http\Controllers\Api\V1\Tenant\WarehouseController::class)
+            ->names('tenant.api.v1.warehouses');
+
+        // Taxes
+        Route::apiResource('taxes', \App\Http\Controllers\Api\V1\Tenant\TaxController::class)
+            ->names('tenant.api.v1.taxes');
     });
 });
