@@ -46,22 +46,30 @@ class PurchaseController extends ApiController
 
             // 2. Crear Ítems (Productables)
             foreach ($items as $item) {
-                $quantity = $item['quantity'];
-                $price = $item['price'];
-                $subtotal = $quantity * $price;
+                $quantity = (float) $item['quantity'];
+                $price = (float) $item['price'];
 
                 $taxRate = 0;
-                $taxAmount = 0;
-                $totalItem = $subtotal;
+                $isPriceInclusive = false;
 
                 if (isset($item['tax_id'])) {
                     $tax = Tax::find($item['tax_id']);
                     if ($tax) {
-                        $taxRate = $tax->rate_percent;
-                        // Cálculo simple de impuesto (asumiendo base imponible = subtotal)
-                        $taxAmount = $subtotal * ($taxRate / 100);
-                        $totalItem = $subtotal + $taxAmount;
+                        $taxRate = (float) $tax->rate_percent;
+                        $isPriceInclusive = (bool) $tax->is_price_inclusive;
                     }
+                }
+
+                if ($isPriceInclusive) {
+                    // El precio ya incluye el impuesto (Total = Cantidad * Precio)
+                    $totalItem = $quantity * $price;
+                    $subtotal = $totalItem / (1 + ($taxRate / 100));
+                    $taxAmount = $totalItem - $subtotal;
+                } else {
+                    // El precio es la base imponible (Total = Subtotal + Impuesto)
+                    $subtotal = $quantity * $price;
+                    $taxAmount = $subtotal * ($taxRate / 100);
+                    $totalItem = $subtotal + $taxAmount;
                 }
 
                 $purchase->productables()->create([
@@ -114,21 +122,28 @@ class PurchaseController extends ApiController
 
                 $totalPurchase = 0;
                 foreach ($data['items'] as $item) {
-                    $quantity = $item['quantity'];
-                    $price = $item['price'];
-                    $subtotal = $quantity * $price;
+                    $quantity = (float) $item['quantity'];
+                    $price = (float) $item['price'];
 
                     $taxRate = 0;
-                    $taxAmount = 0;
-                    $totalItem = $subtotal;
+                    $isPriceInclusive = false;
 
                     if (isset($item['tax_id'])) {
                         $tax = Tax::find($item['tax_id']);
                         if ($tax) {
-                            $taxRate = $tax->rate_percent;
-                            $taxAmount = $subtotal * ($taxRate / 100);
-                            $totalItem = $subtotal + $taxAmount;
+                            $taxRate = (float) $tax->rate_percent;
+                            $isPriceInclusive = (bool) $tax->is_price_inclusive;
                         }
+                    }
+
+                    if ($isPriceInclusive) {
+                        $totalItem = $quantity * $price;
+                        $subtotal = $totalItem / (1 + ($taxRate / 100));
+                        $taxAmount = $totalItem - $subtotal;
+                    } else {
+                        $subtotal = $quantity * $price;
+                        $taxAmount = $subtotal * ($taxRate / 100);
+                        $totalItem = $subtotal + $taxAmount;
                     }
 
                     $purchase->productables()->create([
