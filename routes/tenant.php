@@ -73,5 +73,23 @@ Route::prefix('api/v1')->middleware([
         // Taxes
         Route::apiResource('taxes', \App\Http\Controllers\Api\V1\Tenant\TaxController::class)
             ->names('tenant.api.v1.taxes');
+
+        // Customers
+        Route::apiResource('customers', \App\Http\Controllers\Api\V1\Tenant\CustomerController::class)
+            ->names('tenant.api.v1.customers');
+
+        // Suppliers
+        Route::apiResource('suppliers', \App\Http\Controllers\Api\V1\Tenant\SupplierController::class)
+            ->names('tenant.api.v1.suppliers');
+
+        // Journals
+        Route::apiResource('journals', \App\Http\Controllers\Api\V1\Tenant\JournalController::class)
+            ->names('tenant.api.v1.journals');
+
+        // Purchases
+        Route::post('purchases/{purchase}/post', [\App\Http\Controllers\Api\V1\Tenant\PurchaseController::class, 'post'])
+            ->name('tenant.api.v1.purchases.post');
+        Route::apiResource('purchases', \App\Http\Controllers\Api\V1\Tenant\PurchaseController::class)
+            ->names('tenant.api.v1.purchases');
     });
 });

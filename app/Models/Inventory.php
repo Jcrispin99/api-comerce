@@ -5,9 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Inventory extends Model
 {
+    use LogsActivity;
+
     protected $fillable = [
         'detail',
         'quantity_in',
@@ -76,5 +80,13 @@ class Inventory extends Model
     public function scopeLatestBalance($query)
     {
         return $query->orderBy('created_at', 'desc')->first();
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
     }
 }
