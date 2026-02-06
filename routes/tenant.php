@@ -74,6 +74,14 @@ Route::prefix('api/v1')->middleware([
         Route::apiResource('taxes', \App\Http\Controllers\Api\V1\Tenant\TaxController::class)
             ->names('tenant.api.v1.taxes');
 
+        // Payment Methods
+        Route::apiResource('payment-methods', \App\Http\Controllers\Api\V1\Tenant\PaymentMethodController::class)
+            ->names('tenant.api.v1.payment-methods');
+            
+        // Unit of Measures
+        Route::apiResource('unit-of-measures', \App\Http\Controllers\Api\V1\Tenant\UnitOfMeasureController::class)
+            ->names('tenant.api.v1.unit-of-measures');
+
         // Customers
         Route::apiResource('customers', \App\Http\Controllers\Api\V1\Tenant\CustomerController::class)
             ->names('tenant.api.v1.customers');
@@ -91,5 +99,15 @@ Route::prefix('api/v1')->middleware([
             ->name('tenant.api.v1.purchases.post');
         Route::apiResource('purchases', \App\Http\Controllers\Api\V1\Tenant\PurchaseController::class)
             ->names('tenant.api.v1.purchases');
+
+        // Sales
+        Route::post('sales/{sale}/post', [\App\Http\Controllers\Api\V1\Tenant\SaleController::class, 'post'])
+            ->name('tenant.api.v1.sales.post');
+        Route::apiResource('sales', \App\Http\Controllers\Api\V1\Tenant\SaleController::class)
+            ->names('tenant.api.v1.sales');
+
+        // POS Configs
+        Route::apiResource('pos-configs', \App\Http\Controllers\Api\V1\Tenant\PosConfigController::class)
+            ->names('tenant.api.v1.pos-configs');
     });
 });

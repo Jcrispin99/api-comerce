@@ -5,7 +5,7 @@ namespace App\Http\Requests\Api\V1;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class PurchaseRequest extends FormRequest
+class SaleRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -15,24 +15,32 @@ class PurchaseRequest extends FormRequest
     public function rules(): array
     {
         $isUpdate = $this->isMethod('PUT') || $this->isMethod('PATCH');
-        $purchaseId = $this->route('purchase') ? $this->route('purchase')->id : null;
+        $saleId = $this->route('sale')?->id ?? $this->route('sale');
 
         return [
-            // Cabecera
             'serie' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:255'],
             'correlative' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:255'],
             'journal_id' => [$isUpdate ? 'sometimes' : 'required', 'integer', 'exists:journals,id'],
-            'partner_id' => [$isUpdate ? 'sometimes' : 'required', 'integer', 'exists:partners,id'],
-            'warehouse_id' => [$isUpdate ? 'sometimes' : 'required', 'integer', 'exists:warehouses,id'],
-            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
             'date' => ['nullable', 'date'],
-            'observation' => ['nullable', 'string'],
-            'vendor_bill_number' => ['nullable', 'string', 'max:255'],
-            'vendor_bill_date' => ['nullable', 'date'],
+
+            'partner_id' => ['nullable', 'integer', 'exists:partners,id'],
+            'warehouse_id' => [$isUpdate ? 'sometimes' : 'required', 'integer', 'exists:warehouses,id'],
+            'company_id' => [$isUpdate ? 'sometimes' : 'required', 'integer', 'exists:companies,id'],
+
+            'original_sale_id' => ['nullable', 'integer', Rule::exists('sales', 'id')->whereNot('id', $saleId)],
+            'pos_session_id' => ['nullable', 'integer'],
+
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+
             'status' => ['nullable', Rule::in(['draft', 'posted', 'cancelled'])],
             'payment_status' => ['nullable', Rule::in(['unpaid', 'partial', 'paid'])],
 
-            // Ítems (Productables)
+            'sunat_status' => ['nullable', 'string', 'max:50'],
+            'sunat_response' => ['nullable', 'array'],
+            'sunat_sent_at' => ['nullable', 'date'],
+
+            'notes' => ['nullable', 'string'],
+
             'items' => [$isUpdate ? 'nullable' : 'required', 'array', 'min:1'],
             'items.*.product_product_id' => ['required', 'integer', 'exists:product_products,id'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
@@ -48,12 +56,17 @@ class PurchaseRequest extends FormRequest
             'serie' => 'serie',
             'correlative' => 'correlativo',
             'journal_id' => 'diario',
-            'partner_id' => 'proveedor',
+            'partner_id' => 'cliente',
             'warehouse_id' => 'almacén',
+            'company_id' => 'compañía',
+            'original_sale_id' => 'venta original',
+            'pos_session_id' => 'sesión POS',
+            'user_id' => 'vendedor',
             'items' => 'productos',
             'items.*.product_product_id' => 'producto',
             'items.*.quantity' => 'cantidad',
             'items.*.price' => 'precio',
+            'items.*.unit_of_measure_id' => 'unidad de medida',
         ];
     }
 }

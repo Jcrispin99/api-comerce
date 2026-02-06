@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api\V1\Tenant;
 
 use App\Http\Controllers\Api\ApiController;
-use App\Http\Requests\Api\V1\PurchaseRequest;
-use App\Models\Purchase;
+use App\Http\Requests\Api\V1\SaleRequest;
+use App\Models\Sale;
 use App\Models\Tax;
 use App\Models\UnitOfMeasure;
 use App\Services\KardexService;
@@ -12,42 +12,38 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 /**
- * @group Compras (Tenant)
+ * @group Ventas (Tenant)
  * @authenticated
  *
- * Gestión de órdenes de compra y facturas de proveedores.
+ * Gestión de ventas, notas de crédito y movimientos de salida/retorno de stock.
  */
-class PurchaseController extends ApiController
+final class SaleController extends ApiController
 {
-    protected $kardexService;
-
-    public function __construct(KardexService $kardexService)
-    {
-        $this->kardexService = $kardexService;
-    }
+    public function __construct(private readonly KardexService $kardexService) {}
 
     public function index(): JsonResponse
     {
         return $this->success(
-            Purchase::with(['partner', 'journal', 'warehouse'])->latest()->get()
+            Sale::with(['partner', 'journal', 'warehouse', 'user'])->latest()->get()
         );
     }
 
-    public function store(PurchaseRequest $request): JsonResponse
+    public function store(SaleRequest $request): JsonResponse
     {
         return DB::transaction(function () use ($request) {
             $data = $request->validated();
             $items = $data['items'];
             unset($data['items']);
 
-            // 1. Crear Cabecera de Compra
-            $purchase = Purchase::create($data);
+            $data['user_id'] = $request->user()?->id ?? ($data['user_id'] ?? null);
 
-            $totalPurchase = 0;
+            $sale = Sale::create($data);
 
-            // 2. Crear Ítems (Productables)
+            $subtotalSale = 0;
+            $taxAmountSale = 0;
+            $totalSale = 0;
+
             foreach ($items as $item) {
-                // Obtener datos de la unidad de medida si existe
                 $quantityUom = (float) $item['quantity'];
                 $uomFactor = 1;
                 $unitOfMeasureId = $item['unit_of_measure_id'] ?? null;
@@ -59,12 +55,8 @@ class PurchaseController extends ApiController
                     }
                 }
 
-                // Normalización de Cantidad (Cantidad Real = Cantidad UOM * Factor)
                 $quantityReal = $quantityUom * $uomFactor;
 
-                // Normalización de Precio
-                // El precio ingresado es por UOM. El precio real (base) es Precio UOM / Factor
-                // Ejemplo: Docena cuesta 120. Factor 12. Precio Base = 120 / 12 = 10.
                 $priceUom = (float) $item['price'];
                 $priceReal = $uomFactor > 0 ? ($priceUom / $uomFactor) : $priceUom;
 
@@ -79,43 +71,23 @@ class PurchaseController extends ApiController
                     }
                 }
 
-                // Cálculos de Subtotal e Impuestos usando los valores "Visuales" (UOM)
-                // para mantener consistencia con lo que ve el usuario,
-                // PERO el registro en productables usará los valores normalizados para consistencia de inventario.
-                
-                // Opción A: Calcular todo en base a UOM y luego normalizar subtotal.
-                // Opción B (Preferida): Calcular todo en base a REAL para que la suma total sea exacta.
-                // Usemos los valores reales para los cálculos financieros base.
-                
-                // NOTA: Si el usuario ingresó 1 Docena a 120. Total = 120.
-                // Real: 12 Unidades a 10. Total = 120.
-                // Matemáticamente es idéntico.
-
                 if ($isPriceInclusive) {
-                    // El precio ya incluye el impuesto
                     $totalItem = $quantityReal * $priceReal;
                     $subtotal = $totalItem / (1 + ($taxRate / 100));
                     $taxAmount = $totalItem - $subtotal;
                 } else {
-                    // El precio es la base imponible
                     $subtotal = $quantityReal * $priceReal;
                     $taxAmount = $subtotal * ($taxRate / 100);
                     $totalItem = $subtotal + $taxAmount;
                 }
 
-                $purchase->productables()->create([
+                $sale->productables()->create([
                     'product_product_id' => $item['product_product_id'],
-                    
-                    // Datos Normalizados (Base para Inventario)
                     'quantity' => $quantityReal,
                     'price' => $priceReal,
-                    
-                    // Datos de Presentación (Lo que ingresó el usuario)
                     'unit_of_measure_id' => $unitOfMeasureId,
                     'quantity_uom' => $quantityUom,
                     'uom_factor' => $uomFactor,
-
-                    // Totales Financieros
                     'subtotal' => $subtotal,
                     'tax_id' => $item['tax_id'] ?? null,
                     'tax_rate' => $taxRate,
@@ -123,46 +95,55 @@ class PurchaseController extends ApiController
                     'total' => $totalItem,
                 ]);
 
-                $totalPurchase += $totalItem;
+                $subtotalSale += $subtotal;
+                $taxAmountSale += $taxAmount;
+                $totalSale += $totalItem;
             }
 
-            // 3. Actualizar Total en Cabecera
-            $purchase->update(['total' => $totalPurchase]);
+            $sale->update([
+                'subtotal' => $subtotalSale,
+                'tax_amount' => $taxAmountSale,
+                'total' => $totalSale,
+            ]);
 
-            // 4. Si el estado es 'posted', registrar en Kardex
-            if ($purchase->status === 'posted') {
-                $this->registerPurchaseInKardex($purchase);
+            if ($sale->status === 'posted') {
+                $this->registerSaleInKardex($sale);
             }
 
             return $this->created(
-                $purchase->load(['productables.productProduct', 'partner', 'journal']),
-                'Compra registrada exitosamente.'
+                $sale->load(['productables.productProduct', 'productables.unitOfMeasure', 'partner', 'journal', 'warehouse', 'user']),
+                'Venta registrada exitosamente.'
             );
         });
     }
 
-    public function show(Purchase $purchase): JsonResponse
+    public function show(Sale $sale): JsonResponse
     {
         return $this->success(
-            $purchase->load(['productables.productProduct', 'productables.unitOfMeasure', 'partner', 'journal', 'warehouse'])
+            $sale->load(['productables.productProduct', 'productables.unitOfMeasure', 'partner', 'journal', 'warehouse', 'user', 'inventories'])
         );
     }
 
-    public function update(PurchaseRequest $request, Purchase $purchase): JsonResponse
+    public function update(SaleRequest $request, Sale $sale): JsonResponse
     {
-        return DB::transaction(function () use ($request, $purchase) {
+        if ($sale->status !== 'draft') {
+            return $this->error('Solo se pueden editar ventas en estado borrador.', 422);
+        }
+
+        return DB::transaction(function () use ($request, $sale) {
             $data = $request->validated();
 
-            // Actualizar cabecera si se envían datos
-            $purchase->update($data);
+            unset($data['user_id']);
+            $sale->update($data);
 
-            // Si se envían nuevos ítems, reemplazamos los anteriores
             if (isset($data['items'])) {
-                $purchase->productables()->delete();
+                $sale->productables()->delete();
 
-                $totalPurchase = 0;
+                $subtotalSale = 0;
+                $taxAmountSale = 0;
+                $totalSale = 0;
+
                 foreach ($data['items'] as $item) {
-                    // Obtener datos de la unidad de medida si existe
                     $quantityUom = (float) $item['quantity'];
                     $uomFactor = 1;
                     $unitOfMeasureId = $item['unit_of_measure_id'] ?? null;
@@ -174,8 +155,8 @@ class PurchaseController extends ApiController
                         }
                     }
 
-                    // Normalización
                     $quantityReal = $quantityUom * $uomFactor;
+
                     $priceUom = (float) $item['price'];
                     $priceReal = $uomFactor > 0 ? ($priceUom / $uomFactor) : $priceUom;
 
@@ -200,16 +181,13 @@ class PurchaseController extends ApiController
                         $totalItem = $subtotal + $taxAmount;
                     }
 
-                    $purchase->productables()->create([
+                    $sale->productables()->create([
                         'product_product_id' => $item['product_product_id'],
-                        
                         'quantity' => $quantityReal,
                         'price' => $priceReal,
-                        
                         'unit_of_measure_id' => $unitOfMeasureId,
                         'quantity_uom' => $quantityUom,
                         'uom_factor' => $uomFactor,
-
                         'subtotal' => $subtotal,
                         'tax_id' => $item['tax_id'] ?? null,
                         'tax_rate' => $taxRate,
@@ -217,63 +195,84 @@ class PurchaseController extends ApiController
                         'total' => $totalItem,
                     ]);
 
-                    $totalPurchase += $totalItem;
+                    $subtotalSale += $subtotal;
+                    $taxAmountSale += $taxAmount;
+                    $totalSale += $totalItem;
                 }
-                $purchase->update(['total' => $totalPurchase]);
+
+                $sale->update([
+                    'subtotal' => $subtotalSale,
+                    'tax_amount' => $taxAmountSale,
+                    'total' => $totalSale,
+                ]);
             }
 
             return $this->success(
-                $purchase->load(['productables.productProduct', 'partner', 'journal']),
-                'Compra actualizada exitosamente.'
+                $sale->load(['productables.productProduct', 'productables.unitOfMeasure', 'partner', 'journal', 'warehouse', 'user']),
+                'Venta actualizada exitosamente.'
             );
         });
     }
 
-    public function destroy(Purchase $purchase): JsonResponse
+    public function destroy(Sale $sale): JsonResponse
     {
-        $purchase->delete();
-
-        return $this->success(null, 'Compra eliminada exitosamente.');
-    }
-
-    /**
-     * Confirma la compra y registra los movimientos en el Kardex.
-     */
-    public function post(Purchase $purchase): JsonResponse
-    {
-        if ($purchase->status !== 'draft') {
-            return $this->error('Solo se pueden confirmar compras en estado borrador.', 422);
+        if ($sale->status !== 'draft') {
+            return $this->error('Solo se pueden eliminar ventas en estado borrador.', 422);
         }
 
-        return DB::transaction(function () use ($purchase) {
-            $purchase->update(['status' => 'posted']);
-            $this->registerPurchaseInKardex($purchase);
+        $sale->delete();
+
+        return $this->success(null, 'Venta eliminada exitosamente.');
+    }
+
+    public function post(Sale $sale): JsonResponse
+    {
+        if ($sale->status !== 'draft') {
+            return $this->error('Solo se pueden confirmar ventas en estado borrador.', 422);
+        }
+
+        return DB::transaction(function () use ($sale) {
+            $sale->update(['status' => 'posted']);
+            $this->registerSaleInKardex($sale);
 
             return $this->success(
-                $purchase->load(['productables.productProduct', 'inventories']),
-                'Compra confirmada y stock actualizado.'
+                $sale->load(['productables.productProduct', 'productables.unitOfMeasure', 'inventories']),
+                'Venta confirmada y stock actualizado.'
             );
         });
     }
 
-    /**
-     * Lógica interna para registrar los ítems de la compra en el Kardex.
-     */
-    protected function registerPurchaseInKardex(Purchase $purchase): void
+    protected function registerSaleInKardex(Sale $sale): void
     {
-        foreach ($purchase->productables as $item) {
-            // El KardexService recibe la cantidad y precio YA NORMALIZADOS (base)
-            // porque así los guardamos en la BD ('quantity', 'price', 'subtotal')
-            $this->kardexService->registerEntry(
-                $purchase,
+        $detailPrefix = $sale->original_sale_id ? 'Reversión' : 'Venta';
+
+        foreach ($sale->productables as $item) {
+            if ($sale->original_sale_id) {
+                $lastRecord = $this->kardexService->getLastRecord($item->product_product_id, $sale->warehouse_id);
+                $unitCost = (float) ($lastRecord['cost'] ?? 0);
+
+                $this->kardexService->registerEntry(
+                    $sale,
+                    [
+                        'id' => $item->product_product_id,
+                        'quantity' => $item->quantity,
+                        'price' => $unitCost,
+                    ],
+                    $sale->warehouse_id,
+                    "{$detailPrefix} {$sale->document_number}"
+                );
+
+                continue;
+            }
+
+            $this->kardexService->registerExit(
+                $sale,
                 [
                     'id' => $item->product_product_id,
-                    'quantity' => $item->quantity,     // 12 (si fue docena)
-                    'price' => $item->price,           // 10 (precio unitario real)
-                    'subtotal' => $item->subtotal,     // 120 (total de la línea)
+                    'quantity' => $item->quantity,
                 ],
-                $purchase->warehouse_id,
-                "Compra {$purchase->serie}-{$purchase->correlative}"
+                $sale->warehouse_id,
+                "{$detailPrefix} {$sale->document_number}"
             );
         }
     }

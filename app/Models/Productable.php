@@ -16,6 +16,9 @@ class Productable extends Model
         'productable_id',
         'productable_type',
         'quantity',
+        'unit_of_measure_id',
+        'quantity_uom',
+        'uom_factor',
         'price',
         'subtotal',
         'tax_id',
@@ -28,6 +31,8 @@ class Productable extends Model
     {
         return [
             'quantity' => 'decimal:2',
+            'quantity_uom' => 'decimal:2',
+            'uom_factor' => 'decimal:8',
             'price' => 'decimal:2',
             'subtotal' => 'decimal:2',
             'tax_rate' => 'decimal:2',
@@ -54,6 +59,14 @@ class Productable extends Model
     public function productProduct(): BelongsTo
     {
         return $this->belongsTo(ProductProduct::class, 'product_product_id');
+    }
+
+    /**
+     * Get the unit of measure
+     */
+    public function unitOfMeasure(): BelongsTo
+    {
+        return $this->belongsTo(UnitOfMeasure::class);
     }
 
     /**
